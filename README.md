@@ -144,3 +144,6 @@ Pilih scopes:
 ✅ delete:packages
 Klik Generate token
 Copy token (hanya muncul sekali)
+
+docker login ghcr.io -u kenttannady
+
