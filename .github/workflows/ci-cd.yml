@@ -11,8 +11,6 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
   IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
-  # Opt-out dari warning Node.js (opsional)
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   lint-and-test:
@@ -38,7 +36,7 @@ jobs:
         run: |
           cd backend
           go mod download
-          go mod verify  # Verifikasi go.sum
+          go mod verify
       
       - name: Run go vet
         run: |
@@ -58,19 +56,32 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm ci || npm install  # Fallback jika lockfile tidak ada
+          npm ci || npm install
       
-      - name: Send Telegram notification
+      - name: Send Telegram notification (Success)
         if: success()
-        uses: appleboy/telegram-action@v1.1.0  # Versi terbaru
+        uses: appleboy/telegram-action@v1.0.0
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            ✅ Lint & Test PASSED
-            📦 Repo: ${{ github.repository }}
+            ✅ CI Pipeline - Lint & Test PASSED
+            📦 Repository: ${{ github.repository }}
             🌿 Branch: ${{ github.ref_name }}
             👤 Author: ${{ github.actor }}
+      
+      - name: Send Telegram notification (Failure)
+        if: failure()
+        uses: appleboy/telegram-action@v1.0.0
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ CI Pipeline - Lint & Test FAILED
+            📦 Repository: ${{ github.repository }}
+            🌿 Branch: ${{ github.ref_name }}
+            👤 Author: ${{ github.actor }}
+            🔗 Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   build-and-push:
     needs: lint-and-test
@@ -108,11 +119,25 @@ jobs:
       
       - name: Send success notification
         if: success()
-        uses: appleboy/telegram-action@v1.1.0
+        uses: appleboy/telegram-action@v1.0.0
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
             🚀 Build & Push SUCCESSFUL!
+            📦 Repository: ${{ github.repository }}
             📦 Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
             📦 Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
+            🔗 Images pushed to GitHub Container Registry
+      
+      - name: Send failure notification
+        if: failure()
+        uses: appleboy/telegram-action@v1.0.0
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          message: |
+            ❌ Build & Push FAILED!
+            📦 Repository: ${{ github.repository }}
+            👤 Author: ${{ github.actor }}
+            🔗 Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
