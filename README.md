@@ -122,3 +122,25 @@ Gunakan .env.example sebagai template
  Setup HTTPS (reverse proxy / Traefik / Nginx)
  Integrasi dengan cloud monitoring
  Auto scaling services
+
+Note:
+
+Update Settings di Repository
+Buka Settings → Actions → General
+Scroll ke Workflow permissions
+Pilih:
+✅ Read and write permissions
+✅ Allow GitHub Actions to create and approve pull requests
+Klik Save
+
+Buat Personal Access Token:
+GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+
+Klik Generate new token → Generate new token (classic)
+Beri nama: GHCR_PUSH_TOKEN
+Pilih scopes:
+✅ write:packages
+✅ read:packages
+✅ delete:packages
+Klik Generate token
+Copy token (hanya muncul sekali)
