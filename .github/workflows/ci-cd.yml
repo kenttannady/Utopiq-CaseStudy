@@ -1,5 +1,11 @@
 name: CI/CD Pipeline with Monitoring
 
+# ✅ CRITICAL: Permission untuk push ke GitHub Container Registry
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
 on:
   push:
     branches: [main]
@@ -52,6 +58,11 @@ jobs:
     needs: lint-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    
+    # ✅ Permission khusus untuk job ini
+    permissions:
+      contents: read
+      packages: write
     
     steps:
       - uses: actions/checkout@v4
