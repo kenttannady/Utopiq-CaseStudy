@@ -5,15 +5,16 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  workflow_dispatch:  # Manual trigger dari GitHub UI
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
   IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+  # Opt-out dari warning Node.js (opsional)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  # JOB 1: Lint & Test
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -25,15 +26,29 @@ jobs:
         with:
           go-version: '1.21'
       
-      - name: Go mod download
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      - name: Download dependencies
         run: |
           cd backend
           go mod download
+          go mod verify  # Verifikasi go.sum
       
-      - name: Go vet
+      - name: Run go vet
         run: |
           cd backend
           go vet ./...
+      
+      - name: Run tests
+        run: |
+          cd backend
+          go test -v ./... 2>/dev/null || echo "No tests implemented yet"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,27 +58,20 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm install
+          npm ci || npm install  # Fallback jika lockfile tidak ada
       
-      - name: Run tests
-        run: |
-          cd backend
-          go test -v ./... 2>/dev/null || echo "No tests implemented yet"
-      
-      - name: Send test notification to Telegram
+      - name: Send Telegram notification
         if: success()
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@v1.1.0  # Versi terbaru
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            ✅ CI Pipeline - Lint & Test PASSED
-            📦 Repository: ${{ github.repository }}
+            ✅ Lint & Test PASSED
+            📦 Repo: ${{ github.repository }}
             🌿 Branch: ${{ github.ref_name }}
             👤 Author: ${{ github.actor }}
-            🕐 Time: ${{ github.event.head_commit.timestamp }}
-  
-  # JOB 2: Build & Push Images
+
   build-and-push:
     needs: lint-and-test
     runs-on: ubuntu-latest
@@ -100,7 +108,7 @@ jobs:
       
       - name: Send success notification
         if: success()
-        uses: appleboy/telegram-action@master
+        uses: appleboy/telegram-action@v1.1.0
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -108,44 +116,3 @@ jobs:
             🚀 Build & Push SUCCESSFUL!
             📦 Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
             📦 Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
-            🔗 Images pushed to GitHub Container Registry
-  
-  # JOB 3: Deploy Instructions
-  deploy-instructions:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-      - name: Show deploy instructions
-        run: |
-          echo "=============================================="
-          echo "✅ CI/CD Pipeline Completed Successfully!"
-          echo "=============================================="
-          echo ""
-          echo "📦 Images are available at:"
-          echo "   Backend: ghcr.io/${{ github.repository }}/backend:latest"
-          echo "   Frontend: ghcr.io/${{ github.repository }}/frontend:latest"
-          echo ""
-          echo "🚀 To deploy to your Local Docker Desktop:"
-          echo "   1. docker login ghcr.io -u ${{ github.actor }}"
-          echo "   2. docker compose pull"
-          echo "   3. docker compose up -d"
-          echo ""
-      
-      - name: Send final notification
-        uses: appleboy/telegram-action@master
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            ✅ CI/CD Pipeline COMPLETED!
-            
-            📊 Status: All jobs passed
-            📦 New images pushed to registry
-            🎯 Ready for deployment
-            
-            Deploy with:
-            docker login ghcr.io -u ${{ github.actor }}
-            docker compose pull
-            docker compose up -d
