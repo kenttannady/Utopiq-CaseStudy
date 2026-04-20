@@ -44,13 +44,11 @@ monitoring-demo/
 ### 1. Setup Environment Variables
 
 ```bash
-cp .env.example .env
 
-Edit file .env dan isi dengan credentials yang sesuai.
 
-2. Jalankan Semua Services
+1. Jalankan Semua Services
 docker compose up -d
-3. Cek Logs
+2. Cek Logs
 docker compose logs -f
 🌐 Service Access
 Service	URL	Notes
