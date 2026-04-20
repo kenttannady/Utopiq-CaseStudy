@@ -44,6 +44,11 @@ monitoring-demo/
 ### 1. Setup Environment Variables
 
 ```bash
+buka file backend dan running command
+go mod tidy
+
+untuk menghasilkan go.sum
+
 
 
 1. Jalankan Semua Services
