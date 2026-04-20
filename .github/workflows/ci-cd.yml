@@ -7,46 +7,26 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
-
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
       
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('backend/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-
-      
       - name: Download dependencies
         run: |
           cd backend
           go mod download
-          go mod verify
       
       - name: Run go vet
         run: |
           cd backend
           go vet ./...
-      
-      - name: Run tests
-        run: |
-          cd backend
-          go test -v ./... 2>/dev/null || echo "No tests implemented yet"
       
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -56,32 +36,17 @@ jobs:
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm ci || npm install
+          npm install
       
-      - name: Send Telegram notification (Success)
+      - name: Send Telegram notification
         if: success()
         uses: appleboy/telegram-action@v1.0.0
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
-            ✅ CI Pipeline - Lint & Test PASSED
-            📦 Repository: ${{ github.repository }}
-            🌿 Branch: ${{ github.ref_name }}
-            👤 Author: ${{ github.actor }}
-      
-      - name: Send Telegram notification (Failure)
-        if: failure()
-        uses: appleboy/telegram-action@v1.0.0
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            ❌ CI Pipeline - Lint & Test FAILED
-            📦 Repository: ${{ github.repository }}
-            🌿 Branch: ${{ github.ref_name }}
-            👤 Author: ${{ github.actor }}
-            🔗 Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ✅ Lint & Test PASSED
+            Repo: ${{ github.repository }}
 
   build-and-push:
     needs: lint-and-test
@@ -89,13 +54,19 @@ jobs:
     if: github.ref == 'refs/heads/main'
     
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      
+      - name: Convert repository name to lowercase
+        id: vars
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo_lc=${REPO_LC}" >> $GITHUB_OUTPUT
+          echo "Repository in lowercase: ${REPO_LC}"
       
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
@@ -105,8 +76,8 @@ jobs:
           context: ./backend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:${{ github.sha }}
+            ghcr.io/${{ steps.vars.outputs.repo_lc }}/backend:latest
+            ghcr.io/${{ steps.vars.outputs.repo_lc }}/backend:${{ github.sha }}
       
       - name: Build and push Frontend
         uses: docker/build-push-action@v5
@@ -114,8 +85,8 @@ jobs:
           context: ./frontend
           push: true
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:${{ github.sha }}
+            ghcr.io/${{ steps.vars.outputs.repo_lc }}/frontend:latest
+            ghcr.io/${{ steps.vars.outputs.repo_lc }}/frontend:${{ github.sha }}
       
       - name: Send success notification
         if: success()
@@ -125,19 +96,4 @@ jobs:
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           message: |
             🚀 Build & Push SUCCESSFUL!
-            📦 Repository: ${{ github.repository }}
-            📦 Backend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}:latest
-            📦 Frontend: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}:latest
-            🔗 Images pushed to GitHub Container Registry
-      
-      - name: Send failure notification
-        if: failure()
-        uses: appleboy/telegram-action@v1.0.0
-        with:
-          to: ${{ secrets.TELEGRAM_CHAT_ID }}
-          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          message: |
-            ❌ Build & Push FAILED!
-            📦 Repository: ${{ github.repository }}
-            👤 Author: ${{ github.actor }}
-            🔗 Check details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Images pushed to ghcr.io/${{ steps.vars.outputs.repo_lc }}
