@@ -2,23 +2,27 @@ groups:
   - name: backend_alerts
     interval: 30s
     rules:
-      - alert: HighErrorRate
-        expr: rate(http_requests_total{status="500"}[5m]) > 0.1
+      - alert: BackendHighErrorRate
+        expr: |
+          rate(http_requests_total{status=~"5.."}[5m]) > 0.1
         for: 2m
         labels:
           severity: critical
+          service: backend
         annotations:
-          summary: "High error rate on backend"
-          description: "Error rate is {{ $value }} errors/second"
+          summary: "High error rate on backend API"
+          description: "Error rate is {{ $value | humanize }} errors/second. More than 10% of requests are failing."
 
-      - alert: HighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+      - alert: BackendHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
         for: 2m
         labels:
           severity: warning
+          service: backend
         annotations:
-          summary: "High P95 latency"
-          description: "P95 latency is {{ $value }}s"
+          summary: "High P95 latency on backend"
+          description: "P95 latency is {{ $value | humanizeDuration }}. Response time exceeds 1 second."
 
       - alert: ServiceDown
         expr: up == 0
@@ -27,3 +31,15 @@ groups:
           severity: critical
         annotations:
           summary: "Service {{ $labels.job }} is down"
+          description: "{{ $labels.job }} has been unreachable for more than 1 minute. Immediate action required."
+
+      - alert: FrontendHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(frontend_http_request_duration_seconds_bucket[5m])) > 2
+        for: 2m
+        labels:
+          severity: warning
+          service: frontend
+        annotations:
+          summary: "Frontend latency is high"
+          description: "Frontend P95 latency is {{ $value | humanizeDuration }}"
