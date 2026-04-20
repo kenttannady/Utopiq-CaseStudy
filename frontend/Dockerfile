@@ -2,7 +2,8 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production
+# Ganti npm ci dengan npm install
+RUN npm install --only=production
 COPY server.js .
 RUN npm prune --production
 
